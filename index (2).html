@@ -1,0 +1,1776 @@
+<!DOCTYPE html>
+<html lang="kk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Smart Turaq — 3D ақылды автотұрақ</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    width: 100%; height: 100%;
+    overflow: hidden;
+    font-family: 'Segoe UI', 'Inter', Arial, sans-serif;
+    color: #1e3a5f;
+    -webkit-font-smoothing: antialiased;
+    background: #dceafc;
+  }
+
+  #container { position: fixed; inset: 0; z-index: 1; }
+
+  .panel {
+    position: fixed;
+    z-index: 10;
+    background: rgba(255, 255, 255, 0.94);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(96, 165, 250, 0.35);
+    border-radius: 18px;
+    padding: 16px 18px;
+    box-shadow: 0 12px 40px rgba(30, 58, 95, 0.14), inset 0 1px 0 rgba(255,255,255,0.9);
+  }
+
+  #titlePanel { top: 16px; left: 16px; width: 310px; }
+  #titlePanel h1 {
+    font-size: 22px;
+    letter-spacing: 2px;
+    background: linear-gradient(90deg, #16a34a, #2563eb);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    font-weight: 800;
+  }
+  #titlePanel .sub {
+    font-size: 11px; color: #64748b; letter-spacing: 1px;
+    margin-top: 2px; text-transform: uppercase; font-weight: 600;
+  }
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 7px;
+    margin-top: 14px;
+  }
+  .stat {
+    background: #eff6ff;
+    border: 1px solid rgba(96,165,250,0.35);
+    border-radius: 11px;
+    padding: 7px 3px;
+    text-align: center;
+  }
+  .stat-num {
+    display: block; font-size: 20px; font-weight: 800;
+    color: #1e3a5f; line-height: 1.1;
+  }
+  .stat-lbl {
+    display: block; font-size: 9px; color: #64748b;
+    margin-top: 2px; letter-spacing: .4px; font-weight: 700;
+  }
+  .stat.free { background: #ecfdf5; border-color: rgba(34,197,94,0.45); }
+  .stat.free .stat-num { color: #16a34a; }
+  .stat.busy { background: #fef2f2; border-color: rgba(239,68,68,0.4); }
+  .stat.busy .stat-num { color: #dc2626; }
+  .stat.hand { background: #eff6ff; border-color: rgba(59,130,246,0.45); }
+  .stat.hand .stat-num { color: #2563eb; }
+
+  .badge {
+    margin-top: 12px; padding: 10px; border-radius: 10px;
+    text-align: center; font-size: 11.5px; font-weight: 800;
+    letter-spacing: .6px; transition: all .3s ease;
+  }
+  .badge.free {
+    background: linear-gradient(90deg, #dcfce7, #bbf7d0);
+    border: 1px solid #4ade80; color: #15803d;
+    box-shadow: 0 4px 16px rgba(34,197,94,.25);
+  }
+  .badge.busy {
+    background: linear-gradient(90deg, #fee2e2, #fecaca);
+    border: 1px solid #f87171; color: #b91c1c;
+    animation: pulseRed 1.4s infinite;
+  }
+  @keyframes pulseRed {
+    0%, 100% { box-shadow: 0 4px 16px rgba(239,68,68,.25); }
+    50% { box-shadow: 0 8px 28px rgba(239,68,68,.55); }
+  }
+
+  #controlsPanel {
+    top: 16px; right: 16px; width: 270px;
+    max-height: calc(100vh - 32px); overflow-y: auto;
+  }
+  #controlsPanel h2 {
+    font-size: 13px; letter-spacing: 1.6px; text-transform: uppercase;
+    color: #2563eb; margin-bottom: 12px; font-weight: 800;
+  }
+  #controlsPanel::-webkit-scrollbar { width: 6px; }
+  #controlsPanel::-webkit-scrollbar-thumb { background: rgba(96,165,250,.4); border-radius: 3px; }
+
+  .btn {
+    display: block; width: 100%; padding: 11px 12px; margin-bottom: 8px;
+    border: 1px solid rgba(96,165,250,0.45); border-radius: 11px;
+    background: #eff6ff; color: #1e3a5f;
+    font-size: 12.5px; font-weight: 700; font-family: inherit;
+    cursor: pointer; text-align: left;
+    transition: all .18s ease; letter-spacing: .2px;
+  }
+  .btn:hover:not(:disabled) {
+    background: #dbeafe; border-color: #3b82f6;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 18px rgba(37,99,235,.22);
+  }
+  .btn:active:not(:disabled) { transform: translateY(0); }
+  .btn:disabled { opacity: .4; cursor: not-allowed; }
+
+  .btn.primary {
+    background: linear-gradient(135deg, #22c55e, #16a34a);
+    border-color: #16a34a; color: #fff; font-weight: 800;
+  }
+  .btn.primary:hover:not(:disabled) {
+    background: linear-gradient(135deg, #16a34a, #15803d);
+    box-shadow: 0 8px 22px rgba(34,197,94,.4);
+  }
+  .btn.danger {
+    background: #fef2f2; border-color: #fca5a5; color: #b91c1c;
+  }
+  .btn.danger:hover:not(:disabled) {
+    background: #fee2e2; border-color: #ef4444;
+    box-shadow: 0 6px 18px rgba(220,38,38,.25);
+  }
+  .btn.auto.on {
+    background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+    border-color: #7c3aed; color: #fff;
+    box-shadow: 0 0 22px rgba(139,92,246,.45);
+  }
+  .btn.stem {
+    background: #f0f9ff; border-color: rgba(56,189,248,.5); color: #0369a1;
+  }
+  .btn.stem:hover:not(:disabled) { background: #e0f2fe; border-color: #0ea5e9; }
+
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .row .btn { font-size: 11px; padding: 10px 8px; text-align: center; margin-bottom: 8px; }
+
+  #toast {
+    position: fixed; bottom: 28px; left: 50%;
+    transform: translateX(-50%) translateY(120px);
+    z-index: 100; padding: 13px 26px; border-radius: 12px;
+    font-size: 13.5px; font-weight: 800; letter-spacing: .4px;
+    opacity: 0; transition: all .35s cubic-bezier(.2,.9,.3,1.3);
+    pointer-events: none; max-width: 90vw; text-align: center;
+    box-shadow: 0 12px 40px rgba(0,0,0,.22);
+  }
+  #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+  #toast.ok    { background: linear-gradient(135deg, #22c55e, #16a34a); color:#fff; }
+  #toast.err   { background: linear-gradient(135deg, #ef4444, #dc2626); color:#fff; }
+  #toast.info  { background: linear-gradient(135deg, #3b82f6, #2563eb); color:#fff; }
+
+  .modal {
+    position: fixed; inset: 0; z-index: 200;
+    background: rgba(30, 58, 95, 0.4);
+    backdrop-filter: blur(8px);
+    display: none; align-items: center; justify-content: center;
+    padding: 20px; overflow-y: auto;
+  }
+  .modal.open { display: flex; }
+
+  .modal-content {
+    position: relative; width: min(860px, 100%); max-height: 88vh;
+    overflow-y: auto; background: #ffffff;
+    border: 1px solid rgba(96,165,250,0.4); border-radius: 20px;
+    padding: 30px 34px 36px;
+    box-shadow: 0 30px 90px rgba(30,58,95,.3);
+    animation: modalIn .32s ease;
+  }
+  @keyframes modalIn { from { opacity:0; transform: translateY(24px) scale(.97); } }
+  .modal-content::-webkit-scrollbar { width: 8px; }
+  .modal-content::-webkit-scrollbar-thumb { background: rgba(96,165,250,.4); border-radius: 4px; }
+
+  .close-btn {
+    position: absolute; top: 16px; right: 16px;
+    width: 34px; height: 34px; border-radius: 50%;
+    border: 1px solid rgba(96,165,250,.4); background: #eff6ff;
+    color: #475569; font-size: 15px; cursor: pointer; transition: all .2s;
+  }
+  .close-btn:hover { background: #ef4444; color:#fff; border-color: transparent; }
+
+  .modal-content h2 {
+    font-size: 24px;
+    background: linear-gradient(90deg, #16a34a, #2563eb);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    margin-bottom: 6px; font-weight: 800;
+  }
+  .modal-content .subtitle { color: #64748b; font-size: 13px; margin-bottom: 22px; }
+
+  .stem-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 14px; margin-bottom: 26px;
+  }
+  .stem-card {
+    background: #f8fafc; border: 1px solid rgba(96,165,250,.28);
+    border-radius: 14px; padding: 16px; transition: all .22s;
+  }
+  .stem-card:hover { transform: translateY(-3px); border-color: #3b82f6; box-shadow: 0 10px 28px rgba(37,99,235,.16); }
+  .stem-card .letter {
+    font-size: 28px; font-weight: 900; line-height: 1; margin-bottom: 8px;
+    background: linear-gradient(135deg,#22c55e,#38bdf8);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .stem-card h3 { font-size: 13.5px; margin-bottom: 7px; color: #1e40af; }
+  .stem-card p { font-size: 12.2px; line-height: 1.62; color: #475569; }
+
+  .hw-title { font-size: 15px; color: #0369a1; margin-bottom: 14px; letter-spacing: 1px; text-transform: uppercase; font-weight: 800; }
+  .hw-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; margin-bottom: 22px; }
+  .hw-item {
+    display: flex; gap: 11px; align-items: flex-start;
+    background: #f0fdf4; border-left: 3px solid #22c55e;
+    border-radius: 10px; padding: 12px 14px;
+  }
+  .hw-item .ico { font-size: 19px; line-height: 1; }
+  .hw-item b { display:block; font-size: 12.5px; color:#1e3a5f; margin-bottom: 3px; }
+  .hw-item span { font-size: 11.6px; color: #64748b; line-height: 1.55; }
+
+  .note {
+    background: #eff6ff; border: 1px dashed #60a5fa; border-radius: 12px;
+    padding: 14px 16px; font-size: 12.4px; line-height: 1.7; color: #334155;
+  }
+  .note b { color: #1d4ed8; }
+
+  @media (max-width: 900px) {
+    #titlePanel { width: 230px; padding: 12px 14px; top: 10px; left: 10px; }
+    #titlePanel h1 { font-size: 16px; }
+    #titlePanel .sub { font-size: 9px; }
+    .stat-num { font-size: 15px; }
+    .stat-lbl { font-size: 7.5px; }
+    .badge { font-size: 9.5px; padding: 7px; }
+
+    #controlsPanel {
+      top: auto; bottom: 10px; left: 10px; right: 10px;
+      width: auto; max-height: 42vh; padding: 12px;
+    }
+    #controlsPanel h2 { font-size: 11px; margin-bottom: 8px; }
+    .btn { font-size: 11.5px; padding: 9px 10px; margin-bottom: 6px; }
+    .row .btn { font-size: 10px; padding: 8px 5px; }
+    .modal-content { padding: 22px 18px 26px; }
+    .modal-content h2 { font-size: 19px; }
+  }
+  @media (max-width: 480px) {
+    #titlePanel { width: 175px; padding: 10px; }
+    #titlePanel h1 { font-size: 13px; letter-spacing: 1px; }
+    .stats { gap: 4px; margin-top: 9px; grid-template-columns: repeat(4, 1fr); }
+    .stat { padding: 4px 1px; border-radius: 7px; }
+    .stat-num { font-size: 12px; }
+    .stat-lbl { font-size: 6.5px; }
+    .badge { font-size: 8px; padding: 5px; margin-top: 8px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="container"></div>
+
+<!-- ============ TITLE / STATS ============ -->
+<div class="panel" id="titlePanel">
+  <h1>SMART TURAQ</h1>
+  <div class="sub">3D ақылды автотұрақ жүйесі</div>
+  <div class="stats">
+    <div class="stat"><span class="stat-num" id="statTotal">8</span><span class="stat-lbl">Барлығы</span></div>
+    <div class="stat free"><span class="stat-num" id="statFree">8</span><span class="stat-lbl">Бос</span></div>
+    <div class="stat busy"><span class="stat-num" id="statBusy">0</span><span class="stat-lbl">Бос емес</span></div>
+    <div class="stat hand"><span class="stat-num" id="statHand">2</span><span class="stat-lbl">♿ Мүгедек</span></div>
+  </div>
+  <div class="badge free" id="statusBadge">БОС ОРЫН БАР — КІРУГЕ БОЛАДЫ</div>
+</div>
+
+<!-- ============ CONTROL PANEL ============ -->
+<div class="panel" id="controlsPanel">
+  <h2>Басқару панелі</h2>
+  <button class="btn primary" id="btnSend">🚗 Келесі машинаны жіберу</button>
+  <button class="btn" id="btnExit">🚙 Машинаны шығару</button>
+  <button class="btn" id="btnRandom">🎲 Кездейсоқ машиналарды қосу</button>
+  <button class="btn danger" id="btnReset">🔄 Жүйені қайта бастау</button>
+  <button class="btn auto" id="btnAuto">▶ Автоматты режим</button>
+  <div class="row">
+    <button class="btn" id="btnRotate">🔄 Камераны бұру</button>
+    <button class="btn" id="btnTop">⬆ Жоғарыдан қарау</button>
+  </div>
+  <button class="btn stem" id="btnStem">📚 STEM жоба туралы</button>
+</div>
+
+<div id="toast"></div>
+
+<!-- ============ STEM MODAL ============ -->
+<div class="modal" id="stemModal">
+  <div class="modal-content">
+    <button class="close-btn" id="closeStem">✕</button>
+    <h2>Smart Turaq — STEM жобасы</h2>
+    <div class="subtitle">Датчиктер мен автоматтандырылған басқару жүйесінің көмегімен автотұрақтағы 8 орынды (6 қарапайым + 2 мүгедектер) анықтау</div>
+
+    <div class="stem-grid">
+      <div class="stem-card">
+        <div class="letter">S</div>
+        <h3>Science — Ғылым</h3>
+        <p>Ультрадыбыстық датчик дыбыс толқынын жіберіп, оның кедергіден шағылысып қайту уақытын өлшейді. Қашықтық <b>d = v · t / 2</b> формуласымен есептеледі.</p>
+      </div>
+      <div class="stem-card">
+        <div class="letter">T</div>
+        <h3>Technology — Технология</h3>
+        <p>Микроконтроллер (Arduino) датчиктерден деректерді жинап, өңдейді. Нәтиже LED-экранға, веб-интерфейске және шлагбаумды басқаратын сервомоторға жіберіледі.</p>
+      </div>
+      <div class="stem-card">
+        <div class="letter">E</div>
+        <h3>Engineering — Инженерия</h3>
+        <p>Автотұрақтың геометриясы, кіреберіс/шығу жолақтары, шлагбаумның айналмалы тетігі, күн панелімен жабдықталған шатыр және датчиктердің орналасуы жобаланады.</p>
+      </div>
+      <div class="stem-card">
+        <div class="letter">M</div>
+        <h3>Mathematics — Математика</h3>
+        <p>Бос орын саны әрқашан нақты күйден есептеледі:<br><b>Бос = 8 − БосЕмес</b><br>Мүгедектер орындары бөлек есепке алынады.</p>
+      </div>
+    </div>
+
+    <div class="hw-title">Электроника және құрылғылар</div>
+    <div class="hw-list">
+      <div class="hw-item"><div class="ico">🔌</div><div><b>Arduino Uno / Nano</b><span>Барлық датчиктер мен механизмдерді басқаратын орталық микроконтроллер.</span></div></div>
+      <div class="hw-item"><div class="ico">📡</div><div><b>HC-SR04 ультрадыбыстық датчик</b><span>Әр орынға 1 дана — машинаның бар-жоғын анықтайды.</span></div></div>
+      <div class="hw-item"><div class="ico">⚙️</div><div><b>Сервомотор SG90 / MG996R</b><span>Шлагбаум тұтқасын 0°–90° аралығында айналдырады.</span></div></div>
+      <div class="hw-item"><div class="ico">🖥️</div><div><b>LCD 20×4 / LED матрица</b><span>Кіреберістегі экранда бос орын саны мен күйін көрсетеді.</span></div></div>
+      <div class="hw-item"><div class="ico">💡</div><div><b>RGB LED индикаторлар</b><span>Әр орынның үстінде жасыл/көк (бос) немесе қызыл (бос емес).</span></div></div>
+      <div class="hw-item"><div class="ico">🔋</div><div><b>Қорек көзі 5V / 2A</b><span>Сервомотор мен контроллерді тұрақты токпен қамтамасыз етеді.</span></div></div>
+    </div>
+
+    <div class="note">
+      <b>ℹ️ Симуляция режимі:</b> Бұл веб-сайт нақты Arduino құрылғысына қосылмаған — барлық датчиктер, шлагбаум және көлік қозғалысы бағдарламалық симуляция түрінде жұмыс істейді. Жүйе логикасы нақты аппараттық жобаға толық сәйкес келеді.
+    </div>
+  </div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+/* =========================================================
+   1. ТҰРАҚ ОРЫНДАРЫНЫҢ КОНФИГУРАЦИЯСЫ (3+1 / 1+3)
+   ========================================================= */
+const SPOTS_CONFIG = [
+  // Жоғарғы қатар: №1, №2, №3, ♿1
+  { num: '№1',  x: -9, z: -8.25, rot: Math.PI, disabled: false, top: true  },
+  { num: '№2',  x: -3, z: -8.25, rot: Math.PI, disabled: false, top: true  },
+  { num: '№3',  x:  3, z: -8.25, rot: Math.PI, disabled: false, top: true  },
+  { num: '♿1', x:  9, z: -8.25, rot: Math.PI, disabled: true,  top: true  },
+  // Төменгі қатар: ♿2, №4, №5, №6
+  { num: '♿2', x: -9, z:  8.25, rot: 0,        disabled: true,  top: false },
+  { num: '№4',  x: -3, z:  8.25, rot: 0,        disabled: false, top: false },
+  { num: '№5',  x:  3, z:  8.25, rot: 0,        disabled: false, top: false },
+  { num: '№6',  x:  9, z:  8.25, rot: 0,        disabled: false, top: false },
+];
+const TOTAL_SPOTS = SPOTS_CONFIG.length;  // 8
+const DISABLED_COUNT = SPOTS_CONFIG.filter(s => s.disabled).length;  // 2
+const REGULAR_COUNT = TOTAL_SPOTS - DISABLED_COUNT;  // 6
+
+function getSpotInfo(i) { return SPOTS_CONFIG[i]; }
+
+/* =========================================================
+   2. ТҰРАҚТЫ МӘНДЕР
+   ========================================================= */
+const ROAD_Z = 0;
+const SPAWN_X = -46;
+const BARRIER_X = -22;
+const EXIT_X = 46;
+const CAR_COLORS = [0x2563eb, 0xdc2626, 0xf59e0b, 0x10b981, 0x8b5cf6, 0xec4899, 0x06b6d4, 0xf8fafc, 0x1e293b, 0xf97316];
+
+/* =========================================================
+   3. ЖАҒДАЙ
+   ========================================================= */
+const state = {
+  spots: new Array(TOTAL_SPOTS).fill(null),
+  cars: [],
+  busy: false,
+  auto: false,
+  autoTimer: null
+};
+
+/* =========================================================
+   4. SCENE / CAMERA / RENDERER
+   ========================================================= */
+const container = document.getElementById('container');
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xcfe4fa);
+scene.fog = new THREE.Fog(0xcfe4fa, 120, 280);
+
+const camera = new THREE.PerspectiveCamera(48, window.innerWidth / window.innerHeight, 0.1, 700);
+camera.position.set(30, 48, 48);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.15;
+container.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 0, 0);
+controls.enableDamping = true;
+controls.dampingFactor = 0.07;
+controls.minDistance = 22;
+controls.maxDistance = 140;
+controls.maxPolarAngle = Math.PI / 2.15;
+controls.update();
+
+/* =========================================================
+   5. ЖАРЫҚТАНДЫРУ
+   ========================================================= */
+scene.add(new THREE.HemisphereLight(0xffffff, 0xb8d4c0, 1.15));
+
+const sun = new THREE.DirectionalLight(0xfff8ec, 1.55);
+sun.position.set(45, 80, 32);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.left = -70;
+sun.shadow.camera.right = 70;
+sun.shadow.camera.top = 70;
+sun.shadow.camera.bottom = -70;
+sun.shadow.camera.near = 1;
+sun.shadow.camera.far = 200;
+sun.shadow.bias = -0.0008;
+sun.shadow.normalBias = 0.02;
+scene.add(sun);
+
+const fill = new THREE.DirectionalLight(0xbcd8ff, 0.45);
+fill.position.set(-30, 30, -40);
+scene.add(fill);
+
+/* =========================================================
+   6. ЖЕР / ЖОЛ / АЙМАҚ
+   ========================================================= */
+const ground = new THREE.Mesh(
+  new THREE.PlaneGeometry(340, 340),
+  new THREE.MeshStandardMaterial({ color: 0xb6d4a0, roughness: 0.95 })
+);
+ground.rotation.x = -Math.PI / 2;
+ground.position.y = -0.02;
+ground.receiveShadow = true;
+scene.add(ground);
+
+// Жалпы асфальт аймағы
+const pavement = new THREE.Mesh(
+  new THREE.PlaneGeometry(140, 38),
+  new THREE.MeshStandardMaterial({ color: 0xc8d2da, roughness: 0.92, metalness: 0.02 })
+);
+pavement.rotation.x = -Math.PI / 2;
+pavement.position.set(0, 0.005, 0);
+pavement.receiveShadow = true;
+scene.add(pavement);
+
+// Жол
+const road = new THREE.Mesh(
+  new THREE.PlaneGeometry(140, 9),
+  new THREE.MeshStandardMaterial({ color: 0x8899a8, roughness: 0.9, metalness: 0.05 })
+);
+road.rotation.x = -Math.PI / 2;
+road.position.set(0, 0.02, 0);
+road.receiveShadow = true;
+scene.add(road);
+
+// Орталық үзік сызық
+const dashMat = new THREE.MeshBasicMaterial({ color: 0xfef9c3 });
+for (let x = -66; x <= 66; x += 7) {
+  const dash = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.02, 0.22), dashMat);
+  dash.position.set(x, 0.04, 0);
+  scene.add(dash);
+}
+
+// Жол шеттері
+const edgeMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+[-4.6, 4.6].forEach(z => {
+  const line = new THREE.Mesh(new THREE.BoxGeometry(140, 0.02, 0.2), edgeMat);
+  line.position.set(0, 0.04, z);
+  scene.add(line);
+});
+
+// Кіру бағыты көрсеткілері
+for (let i = 0; i < 3; i++) {
+  const x = -38 + i * 9;
+  const arrow = new THREE.Group();
+  const shaft = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.02, 0.22), new THREE.MeshBasicMaterial({ color: 0x2563eb }));
+  arrow.add(shaft);
+  const head = new THREE.Mesh(new THREE.ConeGeometry(0.6, 1.3, 3), new THREE.MeshBasicMaterial({ color: 0x2563eb }));
+  head.rotation.z = -Math.PI / 2;
+  head.position.set(1.95, 0, 0);
+  arrow.add(head);
+  arrow.position.set(x, 0.045, 3);
+  scene.add(arrow);
+}
+
+/* =========================================================
+   7. ҚОСЫМША ДЕКОРАЦИЯЛЫҚ ЭЛЕМЕНТТЕР
+   ========================================================= */
+// --- Ағаштар ---
+function createTree(x, z, scale = 1) {
+  const g = new THREE.Group();
+  const trunk = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.24, 0.34, 2.4, 8),
+    new THREE.MeshStandardMaterial({ color: 0x8b5a2b, roughness: 0.92 })
+  );
+  trunk.position.y = 1.2;
+  trunk.castShadow = true;
+  g.add(trunk);
+
+  const leafMat = new THREE.MeshStandardMaterial({ color: 0x4ade80, roughness: 0.85 });
+  const f1 = new THREE.Mesh(new THREE.SphereGeometry(1.5, 12, 10), leafMat);
+  f1.position.y = 3.1;
+  f1.scale.set(1, 1.1, 1);
+  f1.castShadow = true;
+  g.add(f1);
+
+  const f2 = new THREE.Mesh(new THREE.SphereGeometry(1.1, 10, 8), leafMat);
+  f2.position.set(0.7, 3.7, 0.3);
+  f2.castShadow = true;
+  g.add(f2);
+
+  const f3 = new THREE.Mesh(new THREE.SphereGeometry(0.95, 10, 8), leafMat);
+  f3.position.set(-0.7, 3.5, -0.4);
+  f3.castShadow = true;
+  g.add(f3);
+
+  g.position.set(x, 0, z);
+  g.scale.setScalar(scale);
+  return g;
+}
+[-28, -18, -6, 6, 18, 28].forEach(x => {
+  scene.add(createTree(x, -19.5, 1.0 + Math.random() * 0.2));
+  scene.add(createTree(x, 19.5, 1.0 + Math.random() * 0.2));
+});
+scene.add(createTree(-40, -16, 1.15));
+scene.add(createTree(-40, 16, 1.15));
+scene.add(createTree(40, -16, 1.15));
+scene.add(createTree(40, 16, 1.15));
+
+// --- Күн панелімен жабдықталған шатыр (жоғарғы қатарға) ---
+function createSolarCanopy() {
+  const g = new THREE.Group();
+  const frameMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.85, roughness: 0.28 });
+  const slatMat = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.55, roughness: 0.5 });
+  const solarMat = new THREE.MeshStandardMaterial({ color: 0x1e3a8a, metalness: 0.75, roughness: 0.25, emissive: 0x0a1e4a, emissiveIntensity: 0.35 });
+
+  const roofY = 6.4;
+  const zFront = -4.4;
+  const zBack  = -12.2;
+
+  // Тіреуіштер
+  [-13.5, -4.5, 4.5, 13.5].forEach(px => {
+    [zFront, zBack].forEach(pz => {
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.32, roofY, 0.32), frameMat);
+      post.position.set(px, roofY / 2, pz);
+      post.castShadow = true;
+      g.add(post);
+    });
+  });
+
+  // Көлденең арқалықтар
+  [zFront, zBack].forEach(pz => {
+    const beam = new THREE.Mesh(new THREE.BoxGeometry(28, 0.28, 0.28), frameMat);
+    beam.position.set(0, roofY, pz);
+    beam.castShadow = true;
+    g.add(beam);
+  });
+
+  // Күн панельдері — 5 үлкен панель
+  const panelZ = (zFront + zBack) / 2;
+  const panelDepth = Math.abs(zFront - zBack) - 0.6;
+  for (let i = 0; i < 5; i++) {
+    const px = -11 + i * 5.5;
+    const panel = new THREE.Mesh(new THREE.BoxGeometry(4.4, 0.16, panelDepth), solarMat);
+    panel.position.set(px, roofY + 0.4, panelZ);
+    panel.rotation.x = -0.14; // slight tilt
+    panel.castShadow = true;
+    g.add(panel);
+
+    // тор сызықтары
+    const gridMat = new THREE.MeshBasicMaterial({ color: 0x93c5fd, transparent: true, opacity: 0.5 });
+    for (let k = 0; k < 4; k++) {
+      const gl = new THREE.Mesh(new THREE.BoxGeometry(4.45, 0.02, 0.06), gridMat);
+      gl.position.set(px, roofY + 0.49, panelZ - panelDepth / 2 + (k + 1) * (panelDepth / 5));
+      gl.rotation.x = -0.14;
+      g.add(gl);
+    }
+  }
+
+  // Шатыр астындағы жарықтар
+  [-9, 0, 9].forEach(px => {
+    const lamp = new THREE.Mesh(
+      new THREE.BoxGeometry(1.6, 0.16, 0.5),
+      new THREE.MeshStandardMaterial({ color: 0xfef3c7, emissive: 0xfef3c7, emissiveIntensity: 1.8 })
+    );
+    lamp.position.set(px, roofY - 0.25, panelZ);
+    g.add(lamp);
+
+    const pl = new THREE.PointLight(0xfff3c4, 0.9, 12, 2);
+    pl.position.set(px, roofY - 0.4, panelZ);
+    g.add(pl);
+  });
+
+  return g;
+}
+scene.add(createSolarCanopy());
+
+// --- EV зарядтау станциясы ---
+function createEVStation(x, z, rotY = 0) {
+  const g = new THREE.Group();
+  const baseMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.75, roughness: 0.32 });
+  const screenMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, emissive: 0x10b981, emissiveIntensity: 0.85, metalness: 0.4, roughness: 0.3 });
+
+  const base = new THREE.Mesh(new THREE.BoxGeometry(0.85, 2.0, 0.55), baseMat);
+  base.position.y = 1.0;
+  base.castShadow = true;
+  g.add(base);
+
+  const screen = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 0.9), screenMat);
+  screen.position.set(0, 1.35, 0.281);
+  g.add(screen);
+
+  const topLight = new THREE.Mesh(
+    new THREE.SphereGeometry(0.12, 12, 12),
+    new THREE.MeshStandardMaterial({ color: 0x10b981, emissive: 0x10b981, emissiveIntensity: 2.5 })
+  );
+  topLight.position.y = 2.1;
+  g.add(topLight);
+
+  // Кабель
+  const cableMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.7 });
+  const cableCurve = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(0.4, 1.6, 0),
+    new THREE.Vector3(0.85, 1.3, 0.2),
+    new THREE.Vector3(1.05, 0.9, 0.35),
+    new THREE.Vector3(1.0, 0.4, 0.3)
+  ]);
+  const cable = new THREE.Mesh(new THREE.TubeGeometry(cableCurve, 24, 0.055, 8, false), cableMat);
+  g.add(cable);
+
+  g.position.set(x, 0, z);
+  g.rotation.y = rotY;
+  return g;
+}
+// ♿1 орынның жанына (жоғарғы оң жақ)
+scene.add(createEVStation(13.5, -8.5, -Math.PI / 2));
+// ♿2 орынның жанына (төменгі сол жақ)
+scene.add(createEVStation(-13.5, 8.5, Math.PI / 2));
+
+// --- Кішкентай ақпараттық дүңгіршек (кіреберісте) ---
+function createKiosk(x, z) {
+  const g = new THREE.Group();
+
+  const wallMat = new THREE.MeshStandardMaterial({ color: 0xf1f5f9, roughness: 0.7, metalness: 0.05 });
+  const glassMat = new THREE.MeshStandardMaterial({ color: 0x93c5fd, metalness: 0.85, roughness: 0.12, transparent: true, opacity: 0.72 });
+  const roofMat = new THREE.MeshStandardMaterial({ color: 0x2563eb, roughness: 0.55, metalness: 0.35 });
+
+  // Негізгі қорап
+  const box = new THREE.Mesh(new THREE.BoxGeometry(3.4, 2.8, 3.0), wallMat);
+  box.position.y = 1.4;
+  box.castShadow = true;
+  box.receiveShadow = true;
+  g.add(box);
+
+  // Шыны терезе
+  const glass = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 1.6), glassMat);
+  glass.position.set(0, 1.6, 1.51);
+  g.add(glass);
+
+  // Есік
+  const door = new THREE.Mesh(new THREE.BoxGeometry(1.0, 2.0, 0.08), new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.5, roughness: 0.4 }));
+  door.position.set(1.05, 1.0, 1.52);
+  g.add(door);
+
+  // Шатыр
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(3.8, 0.3, 3.4), roofMat);
+  roof.position.y = 2.95;
+  roof.castShadow = true;
+  g.add(roof);
+
+  // Тақтайша (SMART TURAQ)
+  const signCanvas = document.createElement('canvas');
+  signCanvas.width = 512; signCanvas.height = 128;
+  const sctx = signCanvas.getContext('2d');
+  sctx.fillStyle = '#2563eb';
+  sctx.fillRect(0, 0, 512, 128);
+  sctx.fillStyle = '#ffffff';
+  sctx.font = 'bold 58px Arial';
+  sctx.textAlign = 'center';
+  sctx.fillText('SMART TURAQ', 256, 85);
+  const signTex = new THREE.CanvasTexture(signCanvas);
+  const sign = new THREE.Mesh(
+    new THREE.PlaneGeometry(3.2, 0.8),
+    new THREE.MeshStandardMaterial({ map: signTex, emissive: 0xffffff, emissiveMap: signTex, emissiveIntensity: 0.6 })
+  );
+  sign.position.set(0, 2.55, 1.52);
+  g.add(sign);
+
+  g.position.set(x, 0, z);
+  return g;
+}
+scene.add(createKiosk(-30, 13));
+
+// --- Орындықтар ---
+function createBench(x, z, rotY = 0) {
+  const g = new THREE.Group();
+  const seatMat = new THREE.MeshStandardMaterial({ color: 0xa16207, roughness: 0.85 });
+  const legMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.7, roughness: 0.4 });
+
+  const seat = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.12, 0.6), seatMat);
+  seat.position.y = 0.5;
+  seat.castShadow = true;
+  g.add(seat);
+
+  const back = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.6, 0.1), seatMat);
+  back.position.set(0, 0.85, -0.25);
+  back.castShadow = true;
+  g.add(back);
+
+  [-0.9, 0.9].forEach(bx => {
+    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.5, 0.55), legMat);
+    leg.position.set(bx, 0.25, 0);
+    leg.castShadow = true;
+    g.add(leg);
+  });
+
+  g.position.set(x, 0, z);
+  g.rotation.y = rotY;
+  return g;
+}
+scene.add(createBench(-18, 13, 0));
+scene.add(createBench(15, -15, Math.PI));
+
+// --- Қоқыс шелектері ---
+function createBin(x, z) {
+  const g = new THREE.Group();
+  const binMat = new THREE.MeshStandardMaterial({ color: 0x16a34a, metalness: 0.5, roughness: 0.45 });
+  const lidMat = new THREE.MeshStandardMaterial({ color: 0x15803d, metalness: 0.6, roughness: 0.35 });
+
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.36, 1.05, 12), binMat);
+  body.position.y = 0.525;
+  body.castShadow = true;
+  g.add(body);
+
+  const lid = new THREE.Mesh(new THREE.CylinderGeometry(0.46, 0.46, 0.12, 12), lidMat);
+  lid.position.y = 1.1;
+  lid.castShadow = true;
+  g.add(lid);
+
+  g.position.set(x, 0, z);
+  return g;
+}
+scene.add(createBin(-16, 12.2));
+scene.add(createBin(14, -14.2));
+scene.add(createBin(-28, 11.5));
+
+// --- Гүл отырғызғыштар (плантерлер) ---
+function createPlanter(x, z) {
+  const g = new THREE.Group();
+  const pot = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.55, 0.62, 0.75, 10),
+    new THREE.MeshStandardMaterial({ color: 0xb45309, roughness: 0.85 })
+  );
+  pot.position.y = 0.375;
+  pot.castShadow = true;
+  g.add(pot);
+
+  const soil = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.5, 0.5, 0.08, 10),
+    new THREE.MeshStandardMaterial({ color: 0x422006, roughness: 0.95 })
+  );
+  soil.position.y = 0.76;
+  g.add(soil);
+
+  // Гүлдер
+  const flowerColors = [0xec4899, 0xf59e0b, 0xef4444, 0x8b5cf6];
+  for (let i = 0; i < 5; i++) {
+    const a = (i / 5) * Math.PI * 2;
+    const r = 0.25;
+    const flower = new THREE.Mesh(
+      new THREE.SphereGeometry(0.13, 8, 8),
+      new THREE.MeshStandardMaterial({
+        color: flowerColors[i % flowerColors.length],
+        emissive: flowerColors[i % flowerColors.length],
+        emissiveIntensity: 0.35,
+        roughness: 0.7
+      })
+    );
+    flower.position.set(Math.cos(a) * r, 0.95 + Math.random() * 0.15, Math.sin(a) * r);
+    flower.castShadow = true;
+    g.add(flower);
+
+    const stem = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.022, 0.022, 0.25, 6),
+      new THREE.MeshStandardMaterial({ color: 0x16a34a })
+    );
+    stem.position.set(Math.cos(a) * r, 0.83, Math.sin(a) * r);
+    g.add(stem);
+  }
+
+  g.position.set(x, 0, z);
+  return g;
+}
+[-16, -12, 12, 16].forEach(x => {
+  scene.add(createPlanter(x, 11.5));
+  scene.add(createPlanter(x, -12.5));
+});
+
+// --- Жылдамдық кедергісі (лежачий полицейский) ---
+function createSpeedBump(x, z) {
+  const bump = new THREE.Mesh(
+    new THREE.BoxGeometry(3.2, 0.22, 9),
+    new THREE.MeshStandardMaterial({ color: 0xfbbf24, roughness: 0.75, metalness: 0.15 })
+  );
+  bump.position.set(x, 0.12, z);
+  bump.receiveShadow = true;
+  scene.add(bump);
+
+  // Қара жолақтар
+  for (let i = 0; i < 4; i++) {
+    const stripe = new THREE.Mesh(
+      new THREE.BoxGeometry(0.4, 0.24, 1.0),
+      new THREE.MeshStandardMaterial({ color: 0x1e293b })
+    );
+    stripe.position.set(x, 0.13, -3.5 + i * 2.3);
+    scene.add(stripe);
+  }
+}
+createSpeedBump(-16, 0);
+
+// --- Жаяулар өткелі (зебра) ---
+function createCrosswalk(x, z) {
+  for (let i = 0; i < 6; i++) {
+    const stripe = new THREE.Mesh(
+      new THREE.BoxGeometry(0.7, 0.02, 8.6),
+      new THREE.MeshBasicMaterial({ color: 0xffffff })
+    );
+    stripe.position.set(x + (i - 2.5) * 0.95, 0.045, z);
+    scene.add(stripe);
+  }
+}
+createCrosswalk(-34, 0);
+
+// --- Бағыттаушы белгілер ---
+function createSign(x, z, rotY, text, color = 0x1e40af) {
+  const g = new THREE.Group();
+
+  const pole = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.09, 0.11, 3.5, 10),
+    new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.7, roughness: 0.4 })
+  );
+  pole.position.y = 1.75;
+  pole.castShadow = true;
+  g.add(pole);
+
+  // Канвас бет
+  const cv = document.createElement('canvas');
+  cv.width = 512; cv.height = 200;
+  const ctx = cv.getContext('2d');
+  ctx.fillStyle = '#' + color.toString(16).padStart(6, '0');
+  ctx.fillRect(0, 0, 512, 200);
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 62px Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText(text, 256, 128);
+
+  const tex = new THREE.CanvasTexture(cv);
+  const signBoard = new THREE.Mesh(
+    new THREE.PlaneGeometry(2.4, 0.94),
+    new THREE.MeshStandardMaterial({ map: tex, side: THREE.DoubleSide, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0.35 })
+  );
+  signBoard.position.set(0, 3.3, 0);
+  g.add(signBoard);
+
+  g.position.set(x, 0, z);
+  g.rotation.y = rotY;
+  return g;
+}
+scene.add(createSign(-36, 7, 0, 'КІРУ →', 0x16a34a));
+scene.add(createSign(36, 7, Math.PI, '← ШЫҒУ', 0xdc2626));
+scene.add(createSign(-36, -7, 0, 'SMART TURAQ', 0x2563eb));
+
+// --- Кіреберістегі бағана (боллардтар) ---
+function createBollard(x, z) {
+  const g = new THREE.Group();
+  const bMat = new THREE.MeshStandardMaterial({ color: 0xfacc15, metalness: 0.5, roughness: 0.4 });
+
+  const b = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.2, 0.95, 12), bMat);
+  b.position.y = 0.475;
+  b.castShadow = true;
+  g.add(b);
+
+  const cap = new THREE.Mesh(
+    new THREE.SphereGeometry(0.17, 12, 10),
+    new THREE.MeshStandardMaterial({ color: 0xf59e0b, emissive: 0xf59e0b, emissiveIntensity: 0.5 })
+  );
+  cap.position.y = 1.0;
+  g.add(cap);
+
+  g.position.set(x, 0, z);
+  return g;
+}
+[-24, -24].forEach(() => {});
+scene.add(createBollard(-24, -5.5));
+scene.add(createBollard(-24, 5.5));
+scene.add(createBollard(-30, -5.5));
+scene.add(createBollard(-30, 5.5));
+
+// --- Аумақ қоршауы (төмен дуал + бағаналар) ---
+function createFence() {
+  const railMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.6, roughness: 0.4 });
+  const postMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.75, roughness: 0.35 });
+
+  // Артқы дуал (жоғарғы жақ)
+  const backRail = new THREE.Mesh(new THREE.BoxGeometry(90, 0.4, 0.15), railMat);
+  backRail.position.set(0, 1.0, -23);
+  backRail.castShadow = true;
+  scene.add(backRail);
+
+  // Алдыңғы дуал (бірақ жол үшін үзіліс)
+  [-38, 38].forEach(cx => {
+    const rail = new THREE.Mesh(new THREE.BoxGeometry(40, 0.4, 0.15), railMat);
+    rail.position.set(cx, 1.0, 23);
+    rail.castShadow = true;
+    scene.add(rail);
+  });
+
+  // Тіреуіш бағаналар
+  for (let x = -45; x <= 45; x += 6) {
+    const post = new THREE.Mesh(new THREE.BoxGeometry(0.22, 1.4, 0.22), postMat);
+    post.position.set(x, 0.7, -23);
+    post.castShadow = true;
+    scene.add(post);
+
+    if (x < -18 || x > 18) {
+      const post2 = post.clone();
+      post2.position.set(x, 0.7, 23);
+      scene.add(post2);
+    }
+  }
+}
+createFence();
+
+/* =========================================================
+   8. ТҰРАҚ ОРЫНДАРЫ
+   ========================================================= */
+const spotMeshes = [];
+const spotSensors = [];
+const spotLabels = [];
+const spotDisabledSymbols = [];
+
+function roundRectPath(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+const SPOT_W = 5.6;
+const SPOT_D = 7.5;
+
+for (let i = 0; i < TOTAL_SPOTS; i++) {
+  const info = getSpotInfo(i);
+  const x = info.x, z = info.z;
+
+  // Негізгі бет
+  const spotMat = new THREE.MeshStandardMaterial({
+    color: 0x4ade80,
+    emissive: 0x22c55e,
+    emissiveIntensity: 0.28,
+    roughness: 0.72,
+    metalness: 0.05
+  });
+  const spot = new THREE.Mesh(new THREE.PlaneGeometry(SPOT_W, SPOT_D), spotMat);
+  spot.rotation.x = -Math.PI / 2;
+  spot.position.set(x, 0.045, z);
+  spot.receiveShadow = true;
+  scene.add(spot);
+  spotMeshes.push(spot);
+
+  // ♿ символы (тек мүгедектер орындарында)
+  if (info.disabled) {
+    const dcv = document.createElement('canvas');
+    dcv.width = 256; dcv.height = 256;
+    const dctx = dcv.getContext('2d');
+    dctx.clearRect(0, 0, 256, 256);
+    dctx.fillStyle = '#ffffff';
+    dctx.font = 'bold 210px Arial';
+    dctx.textAlign = 'center';
+    dctx.textBaseline = 'middle';
+    dctx.fillText('♿', 128, 138);
+
+    const dTex = new THREE.CanvasTexture(dcv);
+    const symMat = new THREE.MeshBasicMaterial({ map: dTex, transparent: true, depthWrite: false });
+    const symPlane = new THREE.Mesh(new THREE.PlaneGeometry(3.0, 3.0), symMat);
+    symPlane.rotation.x = -Math.PI / 2;
+    symPlane.rotation.z = info.top ? Math.PI : 0;
+    symPlane.position.set(x, 0.055, z + (info.top ? 0.8 : -0.8));
+    scene.add(symPlane);
+    spotDisabledSymbols.push(symPlane);
+  }
+
+  // Ақ жиек
+  const lineMat = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 0.25, roughness: 0.7 });
+  const t = 0.14, hgt = 0.05;
+  const mkLine = (bx, bz, bw, bd) => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(bw, hgt, bd), lineMat);
+    m.position.set(bx, 0.075, bz);
+    scene.add(m);
+  };
+  mkLine(x, z - SPOT_D / 2, SPOT_W, t);
+  mkLine(x, z + SPOT_D / 2, SPOT_W, t);
+  mkLine(x - SPOT_W / 2, z, t, SPOT_D);
+  mkLine(x + SPOT_W / 2, z, t, SPOT_D);
+
+  // Датчик бағанасы (жол жақ шеті)
+  const poleZ = info.top ? z + SPOT_D / 2 + 0.5 : z - SPOT_D / 2 - 0.5;
+  const poleMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.5, roughness: 0.35 });
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 4.0, 10), poleMat);
+  pole.position.set(x, 2.0, poleZ);
+  pole.castShadow = true;
+  scene.add(pole);
+
+  const bulbMat = new THREE.MeshStandardMaterial({
+    color: 0x4ade80, emissive: 0x4ade80, emissiveIntensity: 2.5,
+    metalness: 0.2, roughness: 0.3
+  });
+  const sensorBulb = new THREE.Mesh(new THREE.SphereGeometry(0.3, 16, 16), bulbMat);
+  sensorBulb.position.set(x, 4.15, poleZ);
+  scene.add(sensorBulb);
+
+  const sensorLight = new THREE.PointLight(0x4ade80, 1.3, 7, 2);
+  sensorLight.position.copy(sensorBulb.position);
+  scene.add(sensorLight);
+
+  spotSensors.push({ bulb: sensorBulb, light: sensorLight });
+
+  // Sprite белгі
+  const lc = document.createElement('canvas');
+  lc.width = 320; lc.height = 160;
+  const lctx = lc.getContext('2d');
+  const ltex = new THREE.CanvasTexture(lc);
+  ltex.anisotropy = 4;
+
+  const spriteMat = new THREE.SpriteMaterial({ map: ltex, depthTest: false, transparent: true });
+  const sprite = new THREE.Sprite(spriteMat);
+  sprite.scale.set(4.6, 2.3, 1);
+  const spriteZ = info.top ? z - 0.5 : z + 0.5;
+  sprite.position.set(x, 5.5, spriteZ);
+  sprite.renderOrder = 20;
+  scene.add(sprite);
+
+  spotLabels.push({ canvas: lc, ctx: lctx, tex: ltex, sprite });
+}
+
+/* =========================================================
+   9. ШЛАГБАУМ
+   ========================================================= */
+const barrierGroup = new THREE.Group();
+barrierGroup.position.set(BARRIER_X, 0, 5.4);
+scene.add(barrierGroup);
+
+const bPost = new THREE.Mesh(
+  new THREE.BoxGeometry(0.75, 2.1, 0.75),
+  new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.55, roughness: 0.3 })
+);
+bPost.position.y = 1.05;
+bPost.castShadow = true;
+barrierGroup.add(bPost);
+
+const bTopLight = new THREE.Mesh(
+  new THREE.SphereGeometry(0.17, 12, 12),
+  new THREE.MeshStandardMaterial({ color: 0xef4444, emissive: 0xef4444, emissiveIntensity: 2.6 })
+);
+bTopLight.position.y = 2.25;
+barrierGroup.add(bTopLight);
+const bTopLightPoint = new THREE.PointLight(0xef4444, 1.2, 6);
+bTopLightPoint.position.y = 2.25;
+barrierGroup.add(bTopLightPoint);
+
+const armPivot = new THREE.Group();
+armPivot.position.set(0, 1.6, 0);
+barrierGroup.add(armPivot);
+
+const armMat = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 0.15, roughness: 0.5, metalness: 0.2 });
+const arm = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.36, 10.5), armMat);
+arm.position.set(0, 0, -5.25);
+arm.castShadow = true;
+armPivot.add(arm);
+
+const stripeMat = new THREE.MeshStandardMaterial({ color: 0xdc2626, emissive: 0xdc2626, emissiveIntensity: 0.5, roughness: 0.5 });
+for (let i = 0; i < 4; i++) {
+  const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.39, 0.39, 0.9), stripeMat);
+  stripe.position.set(0, 0, -1.6 - i * 2.5);
+  armPivot.add(stripe);
+}
+
+/* =========================================================
+   10. LED ЭКРАН
+   ========================================================= */
+const ledCanvas = document.createElement('canvas');
+ledCanvas.width = 640;
+ledCanvas.height = 400;
+const ledCtx = ledCanvas.getContext('2d');
+const ledTexture = new THREE.CanvasTexture(ledCanvas);
+ledTexture.anisotropy = 8;
+
+const ledBoardGroup = new THREE.Group();
+ledBoardGroup.position.set(-30, 0, 11.5);
+ledBoardGroup.rotation.y = -Math.PI / 2 + 0.35;
+scene.add(ledBoardGroup);
+
+const ledPostMat = new THREE.MeshStandardMaterial({ color: 0xcbd5e1, metalness: 0.6, roughness: 0.35 });
+const ledPost1 = new THREE.Mesh(new THREE.BoxGeometry(0.38, 5.6, 0.38), ledPostMat);
+ledPost1.position.set(-3.0, 2.8, 0);
+ledPost1.castShadow = true;
+ledBoardGroup.add(ledPost1);
+const ledPost2 = ledPost1.clone();
+ledPost2.position.x = 3.0;
+ledBoardGroup.add(ledPost2);
+
+const ledPanel = new THREE.Mesh(
+  new THREE.BoxGeometry(8.8, 5.5, 0.4),
+  new THREE.MeshStandardMaterial({ color: 0xf1f5f9, metalness: 0.4, roughness: 0.45 })
+);
+ledPanel.position.set(0, 5.7, 0);
+ledPanel.castShadow = true;
+ledBoardGroup.add(ledPanel);
+
+const ledScreen = new THREE.Mesh(
+  new THREE.PlaneGeometry(8.2, 5.1),
+  new THREE.MeshStandardMaterial({
+    map: ledTexture, emissive: 0xffffff, emissiveMap: ledTexture,
+    emissiveIntensity: 0.85, roughness: 0.55, metalness: 0.0
+  })
+);
+ledScreen.position.set(0, 5.7, 0.21);
+ledBoardGroup.add(ledScreen);
+
+const ledGlow = new THREE.PointLight(0x38bdf8, 1.2, 18, 2);
+ledGlow.position.set(-29, 5.7, 10.5);
+scene.add(ledGlow);
+
+/* =========================================================
+   11. КӨЛІК ЖАСАУ
+   ========================================================= */
+function createCar(color) {
+  const g = new THREE.Group();
+  const bodyMat = new THREE.MeshStandardMaterial({ color, metalness: 0.55, roughness: 0.35 });
+  const darkMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.4, roughness: 0.6 });
+  const glassMat = new THREE.MeshStandardMaterial({ color: 0xbfdbfe, metalness: 0.9, roughness: 0.1, transparent: true, opacity: 0.68 });
+
+  const body = new THREE.Mesh(new THREE.BoxGeometry(1.95, 0.72, 4.3), bodyMat);
+  body.position.y = 0.76;
+  body.castShadow = true;
+  body.receiveShadow = true;
+  g.add(body);
+
+  const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.72, 0.68, 2.15), glassMat);
+  cabin.position.set(0, 1.42, -0.2);
+  cabin.castShadow = true;
+  g.add(cabin);
+
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(1.78, 0.12, 2.25), bodyMat);
+  roof.position.set(0, 1.78, -0.2);
+  roof.castShadow = true;
+  g.add(roof);
+
+  const headMat = new THREE.MeshStandardMaterial({ color: 0xfffbe0, emissive: 0xfff6b0, emissiveIntensity: 1.8 });
+  [-0.62, 0.62].forEach(x => {
+    const hl = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.2, 0.12), headMat);
+    hl.position.set(x, 0.86, 2.16);
+    g.add(hl);
+  });
+
+  const tailMat = new THREE.MeshStandardMaterial({ color: 0xff3b3b, emissive: 0xff0000, emissiveIntensity: 1.6 });
+  [-0.62, 0.62].forEach(x => {
+    const tl = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.18, 0.12), tailMat);
+    tl.position.set(x, 0.9, -2.16);
+    g.add(tl);
+  });
+
+  const wheelGeo = new THREE.CylinderGeometry(0.42, 0.42, 0.32, 18);
+  const rimGeo = new THREE.CylinderGeometry(0.22, 0.22, 0.34, 12);
+  const rimMat = new THREE.MeshStandardMaterial({ color: 0xcbd5e1, metalness: 0.9, roughness: 0.25 });
+  [[-1.0, 1.42], [1.0, 1.42], [-1.0, -1.42], [1.0, -1.42]].forEach(([x, z]) => {
+    const w = new THREE.Mesh(wheelGeo, darkMat);
+    w.rotation.z = Math.PI / 2;
+    w.position.set(x, 0.42, z);
+    w.castShadow = true;
+    g.add(w);
+
+    const rim = new THREE.Mesh(rimGeo, rimMat);
+    rim.rotation.z = Math.PI / 2;
+    rim.position.set(x + (x > 0 ? 0.02 : -0.02), 0.42, z);
+    g.add(rim);
+  });
+
+  return g;
+}
+
+/* =========================================================
+   12. КӨМЕКШІ ФУНКЦИЯЛАР
+   ========================================================= */
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+function tween(obj, from, to, fromRot, toRot, duration) {
+  return new Promise(resolve => {
+    const t0 = performance.now();
+    function step() {
+      const raw = Math.min((performance.now() - t0) / duration, 1);
+      const e = raw < 0.5 ? 2 * raw * raw : 1 - Math.pow(-2 * raw + 2, 2) / 2;
+      obj.position.lerpVectors(from, to, e);
+      obj.rotation.y = fromRot + (toRot - fromRot) * e;
+      if (raw < 1) requestAnimationFrame(step);
+      else resolve();
+    }
+    requestAnimationFrame(step);
+  });
+}
+
+function tweenScalar(from, to, duration, onUpdate) {
+  return new Promise(resolve => {
+    const t0 = performance.now();
+    function step() {
+      const raw = Math.min((performance.now() - t0) / duration, 1);
+      const e = raw < 0.5 ? 2 * raw * raw : 1 - Math.pow(-2 * raw + 2, 2) / 2;
+      onUpdate(from + (to - from) * e);
+      if (raw < 1) requestAnimationFrame(step);
+      else resolve();
+    }
+    requestAnimationFrame(step);
+  });
+}
+
+let toastTimer = null;
+function toast(msg, type = 'info', ms = 2600) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'show ' + type;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.className = type; }, ms);
+}
+
+/* =========================================================
+   13. ЭКРАНДЫ САЛУ
+   ========================================================= */
+let ledOverride = null;
+
+function drawLED() {
+  const W = ledCanvas.width, H = ledCanvas.height;
+  const free = state.spots.filter(s => s === null).length;
+  const occupied = TOTAL_SPOTS - free;
+  const freeNums = state.spots.map((s, i) => s === null ? getSpotInfo(i).num : null).filter(v => v !== null);
+  const hasFree = free > 0;
+
+  const bg = ledCtx.createLinearGradient(0, 0, 0, H);
+  bg.addColorStop(0, '#0c1a30');
+  bg.addColorStop(1, '#122540');
+  ledCtx.fillStyle = bg;
+  ledCtx.fillRect(0, 0, W, H);
+
+  ledCtx.strokeStyle = hasFree ? '#22c55e' : '#ef4444';
+  ledCtx.lineWidth = 7;
+  ledCtx.strokeRect(5, 5, W - 10, H - 10);
+
+  ledCtx.textAlign = 'center';
+  ledCtx.fillStyle = '#ffffff';
+  ledCtx.font = 'bold 46px Arial, sans-serif';
+  ledCtx.fillText('SMART TURAQ', W / 2, 68);
+
+  ledCtx.strokeStyle = 'rgba(96,165,250,0.5)';
+  ledCtx.lineWidth = 2;
+  ledCtx.beginPath();
+  ledCtx.moveTo(40, 88);
+  ledCtx.lineTo(W - 40, 88);
+  ledCtx.stroke();
+
+  ledCtx.font = 'bold 26px Arial, sans-serif';
+  ledCtx.textAlign = 'left';
+  ledCtx.fillStyle = '#93c5fd';
+  ledCtx.fillText('Барлығы:', 42, 132);
+  ledCtx.fillText('Бос:', 42, 172);
+  ledCtx.fillText('Бос емес:', 42, 212);
+  ledCtx.fillText('♿ Мүгедек:', 42, 252);
+
+  ledCtx.textAlign = 'right';
+  ledCtx.font = 'bold 30px Arial, sans-serif';
+  ledCtx.fillStyle = '#ffffff';
+  ledCtx.fillText(String(TOTAL_SPOTS), W - 44, 132);
+  ledCtx.fillStyle = '#4ade80';
+  ledCtx.fillText(String(free), W - 44, 172);
+  ledCtx.fillStyle = '#f87171';
+  ledCtx.fillText(String(occupied), W - 44, 212);
+  ledCtx.fillStyle = '#60a5fa';
+  ledCtx.fillText(String(DISABLED_COUNT), W - 44, 252);
+
+  let statusText, statusColor;
+  if (ledOverride === 'checking') {
+    statusText = 'ТЕКСЕРУ ЖҮРІП ЖАТЫР...';
+    statusColor = '#2563eb';
+  } else if (hasFree) {
+    statusText = 'БОС ОРЫН БАР — КІРУГЕ БОЛАДЫ';
+    statusColor = '#16a34a';
+  } else {
+    statusText = 'ОРЫН ЖОҚ — КІРУГЕ БОЛМАЙДЫ';
+    statusColor = '#dc2626';
+  }
+
+  ledCtx.fillStyle = statusColor;
+  ledCtx.fillRect(22, 278, W - 44, 58);
+
+  ledCtx.fillStyle = '#ffffff';
+  ledCtx.textAlign = 'center';
+  ledCtx.font = 'bold 23px Arial, sans-serif';
+  ledCtx.fillText(statusText, W / 2, 315);
+
+  ledCtx.font = 'bold 20px Arial, sans-serif';
+  ledCtx.fillStyle = '#7dd3fc';
+  const txt = 'Бос: ' + (freeNums.length ? freeNums.join(' · ') : '—');
+  ledCtx.fillText(txt, W / 2, 372);
+
+  ledTexture.needsUpdate = true;
+}
+
+function drawSpotLabel(i) {
+  const info = getSpotInfo(i);
+  const L = spotLabels[i];
+  const ctx = L.ctx;
+  const W = L.canvas.width, H = L.canvas.height;
+  const occupied = state.spots[i] !== null;
+
+  ctx.clearRect(0, 0, W, H);
+
+  let bg;
+  if (occupied) bg = 'rgba(239,68,68,0.96)';
+  else if (info.disabled) bg = 'rgba(59,130,246,0.96)';
+  else bg = 'rgba(34,197,94,0.96)';
+
+  ctx.fillStyle = bg;
+  roundRectPath(ctx, 6, 6, W - 12, H - 12, 22);
+  ctx.fill();
+
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 5;
+  roundRectPath(ctx, 6, 6, W - 12, H - 12, 22);
+  ctx.stroke();
+
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 62px Arial, sans-serif';
+  ctx.fillText(info.num, W / 2, 78);
+
+  ctx.font = 'bold 30px Arial, sans-serif';
+  ctx.fillText(occupied ? 'БОС ЕМЕС' : 'БОС', W / 2, 126);
+
+  L.tex.needsUpdate = true;
+}
+
+function updateSpotVisual(i) {
+  const info = getSpotInfo(i);
+  const occupied = state.spots[i] !== null;
+  const mat = spotMeshes[i].material;
+
+  if (occupied) {
+    mat.color.setHex(0xef4444);
+    mat.emissive.setHex(0xdc2626);
+    mat.emissiveIntensity = 0.35;
+  } else if (info.disabled) {
+    mat.color.setHex(0x3b82f6);
+    mat.emissive.setHex(0x2563eb);
+    mat.emissiveIntensity = 0.3;
+  } else {
+    mat.color.setHex(0x4ade80);
+    mat.emissive.setHex(0x22c55e);
+    mat.emissiveIntensity = 0.3;
+  }
+
+  const sens = spotSensors[i];
+  const col = occupied ? 0xef4444 : (info.disabled ? 0x3b82f6 : 0x4ade80);
+  sens.bulb.material.color.setHex(col);
+  sens.bulb.material.emissive.setHex(col);
+  sens.light.color.setHex(col);
+
+  drawSpotLabel(i);
+}
+
+function refreshAll() {
+  const free = state.spots.filter(s => s === null).length;
+  const occupied = TOTAL_SPOTS - free;
+
+  document.getElementById('statFree').textContent = free;
+  document.getElementById('statBusy').textContent = occupied;
+
+  const badge = document.getElementById('statusBadge');
+  if (free > 0) {
+    badge.textContent = 'БОС ОРЫН БАР — КІРУГЕ БОЛАДЫ';
+    badge.className = 'badge free';
+  } else {
+    badge.textContent = 'ОРЫН ЖОҚ — КІРУГЕ БОЛМАЙДЫ';
+    badge.className = 'badge busy';
+  }
+
+  for (let i = 0; i < TOTAL_SPOTS; i++) updateSpotVisual(i);
+  drawLED();
+}
+
+/* =========================================================
+   14. ШЛАГБАУМ
+   ========================================================= */
+let barrierOpen = false;
+
+async function openBarrier() {
+  if (barrierOpen) return;
+  barrierOpen = true;
+  bTopLight.material.color.setHex(0x22c55e);
+  bTopLight.material.emissive.setHex(0x22c55e);
+  bTopLightPoint.color.setHex(0x22c55e);
+  await tweenScalar(armPivot.rotation.x, Math.PI / 2, 750, v => { armPivot.rotation.x = v; });
+}
+
+async function closeBarrier() {
+  if (!barrierOpen) return;
+  barrierOpen = false;
+  await tweenScalar(armPivot.rotation.x, 0, 750, v => { armPivot.rotation.x = v; });
+  bTopLight.material.color.setHex(0xef4444);
+  bTopLight.material.emissive.setHex(0xef4444);
+  bTopLightPoint.color.setHex(0xef4444);
+}
+
+/* =========================================================
+   15. МАШИНА КЕЛУ
+   ========================================================= */
+async function sendCar() {
+  if (state.busy) return;
+  state.busy = true;
+  setControlsEnabled(false);
+
+  const color = CAR_COLORS[Math.floor(Math.random() * CAR_COLORS.length)];
+  const car = createCar(color);
+  car.position.set(SPAWN_X, 0, ROAD_Z);
+  car.rotation.y = Math.PI / 2;
+  scene.add(car);
+  state.cars.push(car);
+
+  await tween(car, car.position.clone(), new THREE.Vector3(BARRIER_X - 4.5, 0, ROAD_Z), Math.PI / 2, Math.PI / 2, 1900);
+
+  ledOverride = 'checking';
+  drawLED();
+  await sleep(900);
+
+  const freeIdx = state.spots.findIndex(s => s === null);
+
+  if (freeIdx === -1) {
+    ledOverride = null;
+    drawLED();
+    toast('ОРЫН ЖОҚ — КІРУГЕ БОЛМАЙДЫ', 'err', 3000);
+    await sleep(1500);
+
+    await tween(car, car.position.clone(), new THREE.Vector3(SPAWN_X - 16, 0, ROAD_Z), Math.PI / 2, Math.PI / 2, 1900);
+    scene.remove(car);
+    const ci = state.cars.indexOf(car);
+    if (ci >= 0) state.cars.splice(ci, 1);
+
+    state.busy = false;
+    setControlsEnabled(true);
+    return;
+  }
+
+  const info = getSpotInfo(freeIdx);
+
+  ledOverride = null;
+  drawLED();
+  toast(`${info.num} орын бос — кіруге рұқсат`, 'ok', 2400);
+  await sleep(400);
+
+  await openBarrier();
+  await sleep(200);
+
+  // Қатардың Z-сына дейін жол бойымен
+  await tween(car, car.position.clone(), new THREE.Vector3(info.x, 0, ROAD_Z), Math.PI / 2, Math.PI / 2, 1700);
+
+  // Тұраққа бұрылу
+  await tween(car, car.position.clone(), car.position.clone(), Math.PI / 2, info.rot, 680);
+
+  // Тұраққа кіру
+  await tween(car, car.position.clone(), new THREE.Vector3(info.x, 0, info.z), info.rot, info.rot, 1600);
+
+  closeBarrier();
+
+  state.spots[freeIdx] = car;
+  refreshAll();
+  toast(`Машина ${info.num} орынға қойылды`, 'ok', 2200);
+
+  state.busy = false;
+  setControlsEnabled(true);
+}
+
+/* =========================================================
+   16. МАШИНА ШЫҒУ
+   ========================================================= */
+async function exitCar() {
+  if (state.busy) return;
+
+  const occupiedIdx = state.spots.map((s, i) => s !== null ? i : -1).filter(i => i >= 0);
+  if (occupiedIdx.length === 0) {
+    toast('Тұрақта машина жоқ', 'err', 2000);
+    return;
+  }
+
+  state.busy = true;
+  setControlsEnabled(false);
+
+  const idx = occupiedIdx[Math.floor(Math.random() * occupiedIdx.length)];
+  const car = state.spots[idx];
+  const info = getSpotInfo(idx);
+
+  toast(`${info.num} орыннан машина шығады`, 'info', 2200);
+
+  await openBarrier();
+  await sleep(250);
+
+  // Тұрақтан артқа шығу
+  await tween(car, car.position.clone(), new THREE.Vector3(info.x, 0, ROAD_Z), info.rot, info.rot, 1750);
+  // Бұрылу
+  await tween(car, car.position.clone(), car.position.clone(), info.rot, Math.PI / 2, 650);
+
+  state.spots[idx] = null;
+  refreshAll();
+
+  // Кету
+  await tween(car, car.position.clone(), new THREE.Vector3(EXIT_X, 0, ROAD_Z), Math.PI / 2, Math.PI / 2, 2400);
+  scene.remove(car);
+  const ci = state.cars.indexOf(car);
+  if (ci >= 0) state.cars.splice(ci, 1);
+
+  closeBarrier();
+  toast(`${info.num} орын бос`, 'ok', 2000);
+
+  state.busy = false;
+  setControlsEnabled(true);
+}
+
+/* =========================================================
+   17. КЕЗДЕЙСОҚ МАШИНАЛАР
+   ========================================================= */
+function addRandomCars() {
+  if (state.busy) return;
+  const freeIdx = state.spots.map((s, i) => s === null ? i : -1).filter(i => i >= 0);
+  if (freeIdx.length === 0) {
+    toast('Барлық орындар толы', 'err', 2000);
+    return;
+  }
+
+  const count = Math.min(freeIdx.length, 1 + Math.floor(Math.random() * Math.min(4, freeIdx.length)));
+  const shuffled = freeIdx.sort(() => Math.random() - 0.5).slice(0, count);
+
+  shuffled.forEach(i => {
+    const car = createCar(CAR_COLORS[Math.floor(Math.random() * CAR_COLORS.length)]);
+    const info = getSpotInfo(i);
+    car.position.set(info.x, 0, info.z);
+    car.rotation.y = info.rot;
+    scene.add(car);
+    state.cars.push(car);
+    state.spots[i] = car;
+  });
+
+  refreshAll();
+  toast(`${count} кездейсоқ машина қосылды`, 'info', 2200);
+}
+
+/* =========================================================
+   18. РЕСЕТ
+   ========================================================= */
+function resetSystem() {
+  if (state.busy) return;
+  state.cars.forEach(c => scene.remove(c));
+  state.cars = [];
+  state.spots = new Array(TOTAL_SPOTS).fill(null);
+
+  if (state.auto) toggleAuto();
+
+  barrierOpen = false;
+  armPivot.rotation.x = 0;
+  bTopLight.material.color.setHex(0xef4444);
+  bTopLight.material.emissive.setHex(0xef4444);
+  bTopLightPoint.color.setHex(0xef4444);
+
+  ledOverride = null;
+  refreshAll();
+  toast('Жүйе қайта іске қосылды', 'info', 2200);
+}
+
+/* =========================================================
+   19. АВТОМАТТЫ РЕЖИМ
+   ========================================================= */
+function toggleAuto() {
+  state.auto = !state.auto;
+  const btn = document.getElementById('btnAuto');
+
+  if (state.auto) {
+    btn.textContent = '⏸ Автоматты режим';
+    btn.classList.add('on');
+    toast('Автоматты режим қосылды', 'info', 2000);
+    scheduleAuto();
+  } else {
+    btn.textContent = '▶ Автоматты режим';
+    btn.classList.remove('on');
+    clearTimeout(state.autoTimer);
+    state.autoTimer = null;
+    toast('Автоматты режим өшірілді', 'info', 2000);
+  }
+}
+
+function scheduleAuto() {
+  if (!state.auto) return;
+  state.autoTimer = setTimeout(async () => {
+    if (!state.auto) return;
+    const freeCount = state.spots.filter(s => s === null).length;
+    const occupiedCount = TOTAL_SPOTS - freeCount;
+
+    if (freeCount > 0 && (Math.random() < 0.7 || occupiedCount === 0)) {
+      await sendCar();
+    } else if (occupiedCount > 0) {
+      await exitCar();
+    } else {
+      await sendCar();
+    }
+    if (state.auto) scheduleAuto();
+  }, 3400);
+}
+
+/* =========================================================
+   20. КАМЕРА
+   ========================================================= */
+let camAnimating = false;
+
+function animateCameraTo(targetPos, targetLook, duration = 1200) {
+  if (camAnimating) return;
+  camAnimating = true;
+  const startPos = camera.position.clone();
+  const startLook = controls.target.clone();
+  const t0 = performance.now();
+
+  function step() {
+    const raw = Math.min((performance.now() - t0) / duration, 1);
+    const e = 1 - Math.pow(1 - raw, 3);
+    camera.position.lerpVectors(startPos, targetPos, e);
+    controls.target.lerpVectors(startLook, targetLook, e);
+    controls.update();
+    if (raw < 1) requestAnimationFrame(step);
+    else camAnimating = false;
+  }
+  requestAnimationFrame(step);
+}
+
+function rotateCamera() {
+  const target = controls.target.clone();
+  const r = Math.hypot(camera.position.x - target.x, camera.position.z - target.z);
+  const startAngle = Math.atan2(camera.position.z - target.z, camera.position.x - target.x);
+  const endAngle = startAngle + Math.PI / 2.6;
+  const y = camera.position.y;
+  const endPos = new THREE.Vector3(
+    target.x + r * Math.cos(endAngle), y, target.z + r * Math.sin(endAngle)
+  );
+  animateCameraTo(endPos, target, 1250);
+}
+
+function topView() {
+  animateCameraTo(new THREE.Vector3(0, 78, 12), new THREE.Vector3(0, 0, 0), 1200);
+}
+
+/* =========================================================
+   21. БАТЫРМАЛАР
+   ========================================================= */
+function setControlsEnabled(enabled) {
+  ['btnSend', 'btnExit', 'btnRandom', 'btnReset'].forEach(id => {
+    document.getElementById(id).disabled = !enabled;
+  });
+}
+
+document.getElementById('btnSend').addEventListener('click', sendCar);
+document.getElementById('btnExit').addEventListener('click', exitCar);
+document.getElementById('btnRandom').addEventListener('click', addRandomCars);
+document.getElementById('btnReset').addEventListener('click', resetSystem);
+document.getElementById('btnAuto').addEventListener('click', toggleAuto);
+document.getElementById('btnRotate').addEventListener('click', rotateCamera);
+document.getElementById('btnTop').addEventListener('click', topView);
+
+document.getElementById('btnStem').addEventListener('click', () => {
+  document.getElementById('stemModal').classList.add('open');
+});
+document.getElementById('closeStem').addEventListener('click', () => {
+  document.getElementById('stemModal').classList.remove('open');
+});
+document.getElementById('stemModal').addEventListener('click', e => {
+  if (e.target.id === 'stemModal') e.target.classList.remove('open');
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') document.getElementById('stemModal').classList.remove('open');
+});
+
+/* =========================================================
+   22. БАСТАПҚЫ ЖҮКТЕУ
+   ========================================================= */
+document.getElementById('statTotal').textContent = TOTAL_SPOTS;
+document.getElementById('statHand').textContent = DISABLED_COUNT;
+refreshAll();
+
+/* =========================================================
+   23. RENDER ЦИКЛЫ
+   ========================================================= */
+let frameCount = 0;
+
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+
+  frameCount++;
+  if (frameCount % 3 === 0) {
+    const t = performance.now() * 0.0025;
+    for (let i = 0; i < TOTAL_SPOTS; i++) {
+      const sens = spotSensors[i];
+      const occupied = state.spots[i] !== null;
+      const info = getSpotInfo(i);
+      const base = occupied ? 1.7 : (info.disabled ? 1.5 : 1.4);
+      sens.bulb.material.emissiveIntensity = base + Math.sin(t + i) * 0.5;
+    }
+  }
+
+  ledGlow.intensity = 1.0 + Math.sin(performance.now() * 0.0018) * 0.3;
+  renderer.render(scene, camera);
+}
+animate();
+
+/* =========================================================
+   24. RESIZE
+   ========================================================= */
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+});
+
+setTimeout(() => {
+  toast('Smart Turaq дайын — 8 орын (2 ♿) бос', 'ok', 3200);
+}, 800);
+</script>
+</body>
+</html>
